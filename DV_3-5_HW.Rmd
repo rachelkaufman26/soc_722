@@ -1,0 +1,422 @@
+---
+title: "DV ASSIGN 3-5"
+author: "Rachel Kaufman"
+date: "2022-09-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+**CHAPTER 3,4,5***
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+CHAPTER 3
+
+**loading it up!**
+```{r}
+library(tidyverse)
+# Read in the data 
+exercise_data <- read_csv("Data/visualize_data.csv")
+glimpse(exercise_data)
+```
+So, I would make the general assumption that the more you exercise the lower your BMI, but because BMI is known to suck, so I doubt there is much of a relationship.
+
+
+**Question 1**
+```{r}
+cor(exercise_data$Exercise, exercise_data$BMI)
+```
+This shows a correlation of -0.06, meaning their is little correlation between the two variables.
+```{r}
+ggplot(exercise_data, aes(x = Exercise, y = BMI)) +
+  geom_point()
+  
+```
+
+**Question 2**
+```{r}
+library(causact)
+glimpse(corruptDF)
+
+```
+The HDI is the human development index and CPI is the corruption perceptions index where each observation is a country. I'm going to assume 2017 is just the year the data is from. 
+
+**Question 3**
+```{r}
+
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point()
+  
+```
+There definitely seems to be some sort of relationship between the CPI and HDI indices. There also seems to be non-linear curvature.
+
+**Question 4**
+```{r}
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point() +
+  geom_smooth(method = "gam")+ 
+  labs(x = "HDI", 
+       y = "CPI")
+?gam
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  labs(x = "HDI", 
+       y = "CPI")
+```
+Granted I know nothing about GAM (general additive models?), I prefer the use of that function. By looking at the graph in comparison to the use of the lm method, it seems to not attribute equal weight in the way we see lm operating. I this this could be valuable just in looking at non-linearity, especially as there is a curvature to the scatter plot by itself. The differences visually are that lm uses "y~x" which produces a straight line and gam seems to look more like the scatter plot.
+
+**Question 5**
+It would be interesting to explore if this relationship varies by region. Add a fill and color aesthetic to the graph so that the lines and points are grouped by the variable region.
+```{r}
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017, color = region, fill = region)) +
+  geom_point() +
+  geom_smooth() ##this looks veryyy messy, so i need to make the one line come back
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point(mapping = aes(fill = region, color = region)) +
+  geom_smooth() + 
+  labs(x = "HDI", 
+       y = "CPI")
+```
+I see that EU W. Europe countries are clustered towards the top end of CPI and HDI. In a similar sentiment, it seems that SSA counties are towards the bottom left of the graph. While splitting by region definitely allows me to see more, I don't super see anyother patterns that may of be importance at first glance.
+
+```{r}
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point(mapping = aes(color = region, fill = region, alpha = 0.3)) +
+  geom_smooth() +
+  facet_wrap("region") + 
+  labs(x = "HDI", 
+       y = "CPI")
+```
+Region absolutely makes it look better, I think that making the scatter plot dots smaller and or more translucent could also potentially help with the cluttering. 
+
+
+**Question 6**
+```{r}
+ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point(mapping = aes(color = region, fill = region, alpha = 0.3)) +
+  geom_smooth() +
+  scale_y_reverse() + 
+  labs(x = "HDI", 
+       y = "CPI")
+```
+So I used scale_y_reverse to switch the the order of my Y-axis. It could be useful because I feel like it draws attention on CPI's with higher score and a higher HDI and makes like logical sense, as in damn the lower score means the more curropt, which could potentially help for reading comprehension. 
+
+**Question 7**
+```{r}
+?corruptDF
+ggplot_HDI_CPI <- ggplot(corruptDF, aes(x = HDI2017, y = CPI2017)) +
+  geom_point(mapping = aes(color = region, fill = region, alpha = 0.3)) +
+  geom_smooth() +
+  scale_y_reverse() +
+  labs(x = "HDI", 
+       y = "CPI",
+       title = "The relationship between Human Deprevation Index (HDI) and
+       Corruption Perception Index (CPI) indices",
+       subtitle = "2017",
+         caption = "Data: CPI available from Transparency International, 
+       HDI available from UN Development reports,
+       Population data from World Bank.
+       Accessed 2018.")
+
+```
+The title feels wordy, but eh here we are.
+
+**Question 8**
+```{r}
+##?ggsave
+ggsave("my_ggplot.pdf", plot = ggplot_HDI_CPI)
+```
+
+
+
+**CHAPTER 4**
+**Question 1** 
+```{r}
+##tidyverse is already downloaded, see line 17.
+tv_ratings <- read_csv("Data/tv_ratings.csv")
+glimpse(tv_ratings)
+```
+
+now i am fiddling with the data set, tidying her up
+```{r}
+tv_long <- tv_ratings %>% 
+  group_by(title) %>% 
+  summarize(number_seasons = n()) %>% 
+  ungroup() %>% 
+  left_join(tv_ratings, by = "title")
+
+tv_long <- tv_long %>% ##five or more seasons, this alters tv_long
+  filter(number_seasons >= 5)
+
+```
+
+time to make a line plot for average ratings across seasons
+```{r}
+ggplot(tv_long, aes(x = seasonNumber, y = av_rating)) +
+  geom_line(mapping = aes(group = title)) +
+   labs(x = "Number of Seasons",
+       y = "Average Ratings")
+```
+I'm going to say.... no I cannot come up with any conclusions of this ugly line plot.
+
+
+**Question 2**
+```{r}
+ggplot(tv_long, aes(x = seasonNumber, y = av_rating, color = av_rating)) +
+  geom_line(mapping = aes(group = title)) +
+  facet_wrap("genres") +
+  labs(x = "Number of Seasons",
+       y = "Average Ratings")
+```
+it seems that crime, drama, mystery and drama, romance last longer than other shows. 
+There also seems to be a dip, then the show ends, in ratings around 5-7 seasons. That makes logisitcal sense, ya know? Show gets bad reviews, show ends. Interesting that drama sport eends on a high note, but there is only one plotted line so...
+
+```{r}
+tv_long %>% 
+  filter(genres == "Drama,Family,Fantasy") %>% 
+  select(title)
+```
+It is the show, are you afraid of the dark? That had the plummeted ratings. 
+
+**Question 3**
+```{r}
+top_tier_shows <- tv_ratings %>% 
+  group_by(title) %>% 
+  mutate(num_seasons = max(seasonNumber)) %>% 
+  filter(num_seasons >= 9) %>% 
+  ungroup()
+
+ggplot(top_tier_shows, aes(x = genres)) +
+  geom_bar() + 
+  coord_flip()
+```
+Crime, Drama, and Mystery!
+
+**Question 4**
+```{r}
+comedies_dramas <- tv_ratings %>% 
+  mutate(comedy_is = if_else(str_detect(genres, "Comedy"),
+                             1, #the argument post commedy requires the next two entries, 1 for if it has commedy in it and 0 if it does not (that is why it is an if else statement haha)
+                             0)) %>% 
+           filter(comedy_is == 1 | genres == "Drama") %>% 
+           mutate(genres = if_else(genres == "Drama",
+                                 "Drama",
+                                 "Comedy"))
+glimpse(comedies_dramas)
+```
+
+```{r}
+ggplot(comedies_dramas, aes(x = av_rating, fill = genres, color = genres)) +
+  geom_density(alpha = 0.3)
+```
+Comedy does have a greater density for shows with the average rating at 8 in comparison to dramas. I looks like dramas have more weight in the 9 and 10 areas of the scale in terms of having greater density though. 
+
+**Question 5**
+```{r}
+ggplot(comedies_dramas, aes(x = av_rating, fill = genres, color = genres)) +
+  geom_histogram()
+ggplot(comedies_dramas, aes(x = av_rating, fill = genres, color = genres)) +
+  geom_freqpoly()
+```
+I think the density plot provides a better story because it shows the distribution of the ratings because it is a proptional esetimate in comparison to the other two giving count data. 
+
+**Question 6**
+```{r}
+ggplot(comedies_dramas, aes(x = av_rating, y = share)) +
+  geom_bin_2d()
+```
+In this I see that there are a few shows that really capture attention, and then whoever has a 1 rating but has been on for 5+ seasons really must be bad. 
+
+```{r}
+ggplot(comedies_dramas, aes(x = av_rating, y = share, fill = genres, color = genres)) +
+  geom_bin_2d(mapping = aes(fill = genres)) 
+
+```
+Now to find out what drama captured everyones attention... I just feel like it is grey's anatomy....
+
+```{r}
+comedies_dramas %>% 
+  group_by(genres, title) %>% 
+  select(title, share) %>% 
+  arrange(desc(share))
+```
+Dekalog??? I guess that is the answer but i have NEVER heard of this show. 
+
+
+**CHAPTER 5**
+```{r}
+wncaa <- read_csv("Data/wncaa.csv")
+glimpse(wncaa)
+```
+
+**Question 1**
+```{r}
+champ_energy <- wncaa %>% 
+  filter(tourney_finish == "Champ") %>% 
+  group_by(school) %>% ##unsure about this groupby here
+  summarize(N = n()) %>% 
+  mutate(freq = N / sum(N),
+         percent_wins = round(freq*100,0)) %>% 
+  arrange(desc(percent_wins))
+
+ggplot(champ_energy, aes(x = reorder(school, percent_wins), y = percent_wins, fill = school)) +
+  geom_col(position = "dodge") +
+  guides(fill = "none") +
+  coord_flip()  ##why does it not want to do this
+```
+It looks that the two teams with the most wins (via %) are uconn and Tennessee
+
+
+**Question 2**
+```{r}
+champ_names <- unique(champ_energy$school)
+winners <- wncaa %>% 
+  filter(school %in% champ_names)
+
+ggplot(winners, aes(y = seed, 
+                    x = reorder(school, seed),
+                    fill = school
+                    )) +
+  geom_boxplot() +
+  coord_flip()
+
+ggplot(winners, aes(y = seed, 
+                    x = school,
+                    fill = school
+                    )) +
+  geom_violin() +
+  coord_flip()
+```
+I think Box plots in this particular situation are more useful because the median tick mark helps the reader see where exactly they should be looking in comparison to the other schools. 
+
+**Question 3**
+```{r}
+ggplot(winners, aes(y = seed, x = school,vfill = school)) +
+  geom_point() +
+  coord_flip()
+```
+Geom point does not work as well because the seeds that are given are the changes over time (i think?) and these little dot guys do not really give any indication of what is more or less important to look at. 
+
+**Question 4**
+```{r}
+winners_sum <- winners %>% 
+  group_by(school) %>%
+  summarise_if(is.numeric, funs(mean,sd), na.rm = TRUE) %>%
+  ungroup()
+
+ggplot(winners_sum, aes(x = school, y = reg_percent_mean, fill = school)) +
+  geom_point() +
+  coord_flip() +
+  labs(y = "% Mean of Wins")
+
+ggplot(winners_sum, aes(x = school, y = reg_percent_mean, fill = school)) +
+  geom_pointrange(mapping = aes(ymin = reg_percent_mean - reg_percent_sd, ymax = reg_percent_mean + reg_percent_sd)) +
+  coord_flip()
+
+ggplot(winners_sum, aes(x = school, y = reg_percent_mean, fill = school)) +
+  geom_linerange(mapping = aes(ymin = reg_percent_mean - reg_percent_sd, ymax = reg_percent_mean + reg_percent_sd)) +
+  coord_flip() ##i prefer pointrange
+```
+The results indicate that UConn has the the largest average win percentage (not surprising, they have been RAW for a solid ten years), and A&M sucks which is great because Ally went UT hookem'! As for the team with the most narrow interval, it is A&M, again, WHICH YAY! Screw aggies. 
+
+**Question 5**
+```{r}
+ggplot(winners, aes(x = reg_percent, y = full_percent, fill = school, color = school)) +
+  geom_point(aes(fill = school)) +
+  geom_abline() +
+  labs(x = "Regular Season % of Wins",
+       y = "After Tournament % of Wins",
+       Title = 
+       "Performance of Schools' Wins")
+  
+```
+In terms of patterns it is interesting that both the full and reg percents stay above 60 (for the most part). When I added in color = school, i am able to better see which schools lang on top and bottom, which again shows UCONN dominating. 
+
+**Question 6**
+```{r}
+#champs variable 
+winners <- winners %>%
+  mutate(is_champ = if_else(tourney_finish == "Champ", 1, 0),
+         is_champ = as.factor(is_champ)) ##mutate creates a new col!
+
+ggplot(winners, aes(x = reg_percent, y = full_percent,
+                            color = is_champ)) +
+  geom_point() + 
+  geom_abline() +
+  labs(x = "Regular Season % of Wins",
+       y = "After tournament % of Wins",
+     title = "Performance of Schools Wins'",
+     col = "Champ Status") +
+  scale_colour_discrete(labels = c("No", "Yes"))
+
+##what happens when you remove the as.factor argument
+winners <- winners %>%
+  mutate(is_champ_nofactor = if_else
+         (tourney_finish == "Champ", 1, 0))
+
+ggplot(winners, aes(x = reg_percent,y = full_percent,
+                    color = is_champ_nofactor)) +
+  geom_point() + 
+  geom_abline() +
+  labs(x = "Regular Season % of Wins", y = "After tournament % of Wins",
+       title = "Performance of Schools Wins'",
+       col = "Champ Status")
+```
+You get numeric values instead of discrete values! Champs seem to have improvement over time, which makes sense because practice makes perfect. 
+
+**Question 7**
+Do you see anything interesting? I'll give you a hint: the school that has overperformed the most has been the same one, one decade apart.
+```{r}
+winners <- winners %>% 
+  mutate(plot_label = paste(school, year, sep = "-"))
+winners <- winners %>% 
+  mutate(difference = full_percent - reg_percent) 
+##time to label points of interest..... yikes!
+winners_2 <- winners %>% 
+  filter(reg_percent < 50 | reg_percent <= 70 & full_percent >= 70)
+
+#install.packages("ggrepel") 
+          ##bestie Healy used this for point finding
+library(ggrepel)
+```
+
+Time to make my plot with labels now!
+```{r}
+champ_labeling_plot <- ggplot(winners, aes(x = reg_percent,
+                                   y = full_percent)) +
+  geom_point() + 
+  geom_abline()
+##breaking it up here to help with the cluttering
+champ_labeling_plot +
+  geom_text_repel(data = winners_2,
+                  mapping = aes(label = plot_label, color = school),
+                  hjust = -3.5, vjust = .4) +
+  labs(x = "Regular Season % of Wins", y = "After tournament % of Wins",
+     title = "Performance of Schools Wins'",
+     subtitle = "(Regular and Post Tournament)")
+##unsure how to remove Tennessee from being plotted twice
+```
+In terms of interesting, I am curious as to how Notre Dame can suck that bad in 92. Like what on earth was happening there? It is also interesting to see how Tennessee falls on this plot. 
+**Question 8**
+```{r}
+winners %>%
+  group_by(school) %>%
+  filter(full_percent == 100 & reg_percent == 100)
+```
+Me smiling for UT rn :')
+The undefeated teams are Baylor, UConn, and UT! In terms of being surprised, I don't really like Baylor so that was suprsing, but ya know. Is what it is. I think I was especially suprsied by UT, but that sort of makes sense as it wad 1986. Lastly, UConn just win after win for TWO DECADES! That is pretty insane. 
+
+
+
+
+
+
+
+
+
+
+
+
