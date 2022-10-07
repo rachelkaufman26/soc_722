@@ -1,0 +1,413 @@
+---
+title: "Statistical Rethinking: Chapter 5 Problems"
+author: "Rachel Kaufman"
+date: "2022-10-05"
+output: html_document
+---
+# Chapter 5 Assignment
+Loading my packages :)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+library(tidybayes)
+library(rethinking)
+library(tidybayes.rethinking)
+library(devtools)
+library(patchwork)
+library(bayesplot)
+library(devtools)
+library(ggdag)
+library(dagitty)
+library(patchwork)
+```
+
+## Easy Problems
+
+### 5E1
+*Which of the linear models below are multiple linear regression?*
+$$
+\begin{aligned}
+\mu_i&=\alpha + \beta(x)_i \\
+\mu_i&=\ \beta_xx_i + \beta_zz_i\\
+\mu_i&=\alpha + \beta(x_i-z_i)\\
+\mu_i&=\alpha + \beta_xx_i + \beta_zz_i\
+\end{aligned}
+$$
+Lines 2 and 4 are multiple linear regression. This is because the have added multiple slopes which is very cool. I am not sure how a regression equation would involve subtraction (-)... so I really do not think (3) is involved. 
+
+### 5E2
+*Write down a multiple regression to evaluate the claim: Animal diversity is linearly related to latitude, but only after controlling for plant diversity. You just need to write down the model definition.*
+Okay, to start here I am going to create some easy lables for the given variables. Where A is animal diversity, L is latitude, and P is plant diversity.
+$$
+\begin{aligned}
+A_i &\sim Normal(\mu, \sigma) \\
+\mu_i &= \alpha + \beta_lL_i + \beta_pP_i \\
+\end{aligned}
+$$
+Where A is animal diversity, L is latitude, and P is plant diversity. I was not entirely sure here if Animal diversity was my outcome variable, but it seemed that latitude was not really a variable that could change according to biodiversity so I made it one of my independent variables.
+
+### 5E3
+*Write down a multiple regression to evaluate the claim: Neither amount of funding nor size of laboratory is by itself a good predictor of time to PhD degree; but together these variables are both positively associated with time to degree. Write down the model definition and indicate which side of zero each slope parameter should be on.*
+
+Okay, to start lets get some labels to my variables.
+T= Time to get PhD degree
+F= funding amount
+S= laboratory size.
+
+While if they were both separate regressions the slopes could go either way (not a good predictor is not a whole lot of information), when combined in a multilinear regression they have a positive association. Because of this, I would say both slope parameters ought to fall on the right/positive side.
+$$
+\begin{aligned}
+\ T &\sim Normal(\mu, \sigma)\\
+\mu_i &= \alpha + \beta_fF_i + \beta_sS_i\\
+\end{aligned}
+$$
+### 5E4
+*Suppose you have a single categorical predictor with 4 levels (unique values), labeled A, B, C and D. Let Ai be an indicator variable that is 1 where case i is in category A. Also suppose Bi, Ci, and Di for the other categories. Now which of the following linear models are inferentially equivalent ways to include the categorical variable in a regression? Models are inferentially equivalent when it’s possible to compute one posterior distribution from the posterior distribution of another model.*
+
+Okay, because that is a lot to type, I'm going to note type the 1-5 here. I feel pretty content in my latex practice.
+
+As for my answer, it is definitely *(1),(3),(4), and (5)*. While the term interentially equivalent is a little confusing, I know that to have four categorical variables means i am in need of three slopes explicitly and an intercept. Plus, I am not really sure why *(4)* is distributing the alpha, but that still has the requirements for what we are looking for. Attaching it to each slope *really* makes no sense because then it takes away its role as an intercept to me...I will say that *(2)* is just a repetition of the fourth category we do not need.
+
+## Medium Problems
+
+### 5M1
+*Invent your own example of a spurious correlation. An outcome variable should be correlated with both predictor variables. But when both predictors are entered in the same model, the correlation between the outcome and one of the predictors should mostly vanish (or at least be greatly reduced).*
+
+Okay, I am going to use an example we used in methods. This example states that 
+
+X = Number of sidewalks
+Y = Accidents involving pedestrians
+T = Traffic
+
+I am attempting to create a DAG! Feeling fancy. It's ugly, but it will do just fine
+```{r}
+dag <- dagify(y ~ x + T, #i kept getting an error if I tried to change this DAG label from the classic x and y so i just left it as is for now.
+                     x ~ T,
+                     exposure = "x",
+                     outcome = "y")
+ggdag(dag, layout = "circle")
+```
+
+Now, on to simulated data for this bad boy example. I'm changing the labels to the following to help me conceptualize the data:
+S = Number of sidewalks
+A = Accidents involving pedestrians
+Tr = Traffic
+```{r}
+N <- 100 
+d <- tibble( #super important, always use tibble
+  Tr = rnorm(N, 0, 1), ##here, R can assume 0 and 1 but I am typing it to remember that 0 is for my mean and 1 is for SD
+  S = rnorm(N, Tr),
+  A = rnorm(N, Tr)) %>% 
+  mutate(across(everything(), scale)) 
+
+```
+
+Now that I have a simulation, I can turn this into a quadratic approximation.
+```{r}
+## First for my sidewalks and accidents involving pedestrians
+SA_simulation <- quap( 
+  alist(
+  A ~ dnorm(mu, sigma),
+  mu <- a + bS*S,
+  a ~ dnorm(0,0.2),
+  bS ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = d)
+ 
+## Second for Traffic and accidents involving pedestrians
+
+TrA_simulation <- quap( 
+  alist(
+  A ~ dnorm(mu, sigma),
+  mu <- a + bTr*Tr,
+  a ~ dnorm(0,0.2),
+  bTr ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = d)
+
+## now all three together <3
+TrAS_simulation <- quap( 
+  alist(
+  A ~ dnorm(mu, sigma),
+  mu <- a + bS*S + bTr*Tr,
+  a ~ dnorm(0,0.2),
+  bS ~ dnorm(0,0.2),
+  bTr ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = d)
+
+precis(SA_simulation) %>%  plot()
+
+```
+The Precis() function is showing me what I need to see how the simulated data is showing the relationships as two separate linear regressions, and then what this would be interpreted as with a multilinear regression process. While the number of sidewalks is correllated to the number of pedestrian related car accidents, it is traffic, as prior variable with spuriousness correlation in this example. 
+
+To actually illustrate this, I could (and should) make a coef() plot. Here, I am going to use base R, and for the next question I am going to work making this plot in tidy. 
+```{r}
+plot(coeftab(SA_simulation, TrA_simulation, TrAS_simulation), pars = c("bTr", "bS"))
+```
+Looking at the product of this plot, I am splitting the comparison with two groupings, bTr which is my traffic as it is related to accidents slope remains pertinent even as you include sidewalks into turning from a linear regression to a multilinear regression. The second part of this coef() is relative to the beta slope of number of sidewalks, where this variable on its own has a correlation to accidents, but when traffic is concluded, the coefficent variation hovers around a mean value of 0. This means there is little to no relationship now, and that when they are combined, spuriousness can be revealed! Exactly what we anticipated.
+
+### 5M2
+*Invent your own example of a masked relationship. An outcome variable should be correlated with both predictor variables, but in opposite directions. And the two predictor variables should be correlated with one another.*
+
+The smarter you are, the more likely you are to read for pleasure. You are less likely to read for pleasure the more attractive you are. Then lastly, smarter people are correlated with being attractive. Embarrassed that this is the one I came up with, but here we are. 
+S = smart
+R = reading
+A = attractive
+Here I am, at it again with the same process I did above. 
+```{r}
+n <- 100 
+d2 <- tibble(
+  At = rnorm(n),
+  Sm = rnorm(n, At),
+  R = rnorm(n, Sm - At)) %>% #subtracting for masked simulation
+  mutate(across(everything(), 
+                 ~ (.x - mean(.x)) / sd(.x))) # standardizing to z scores same as line 99
+
+```
+
+and then here, I will do the quad approx again. 
+```{r}
+## First for my Attractive and Reading variables
+AtR_sim <- quap( 
+  alist(
+  R ~ dnorm(mu, sigma),
+  mu <- a + bAt*At,
+  a ~ dnorm(0,0.2),
+  bAt ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = d2)
+ 
+## Second for smart and reading variables
+
+SmR_sim <- quap( 
+  alist(
+  R ~ dnorm(mu, sigma),
+  mu <- a + bSm*Sm,
+  a ~ dnorm(0,0.2),
+  bSm ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = d2)
+
+## now all three together <3
+SmAtR_sim <- quap( 
+  alist(
+  R ~ dnorm(mu, sigma),
+  mu <- a + bSm*Sm + bAt*At,
+  a ~ dnorm(0,0.2),
+  bSm ~ dnorm(0,0.2),
+  bAt ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = d2)
+
+```
+
+Our line up in numbers...
+```{r}
+precis(SmAtR_sim)
+precis(SmR_sim)
+precis(AtR_sim)
+```
+
+For this one, I am using the tidy way Pablo posted, I am finding this more confusing to interpret than the coef() base R plot in the book. 
+```{r}
+
+models <- list(SmR = SmR_sim, # list your first plots here, 
+                 AtR = AtR_sim, # rename what you want them to show up as
+                 SmAtR = SmAtR_sim)
+
+  # Function to extract coefficients
+  coef_tbl <- 
+    lapply(1:length(models),function(x){
+    
+    tbl <- precis(models[[x]]) # Mean and compatibility intervals for coef
+    model <- names(models)[x] # The name of the model the coefs are coming from
+   
+    # Put it together and return it
+     tbl |> 
+      as_tibble() |> 
+      mutate(coef = rownames(tbl),
+             model = model) |> 
+      relocate(model,coef)
+    
+  }) |> 
+    bind_rows()
+
+  # Plot the coefficients
+  coef_tbl |> 
+    ggplot(aes(mean,coef, color = model)) +
+    geom_point() +
+    geom_linerange(aes(xmin = `5.5%`, xmax = `94.5%`)) +
+    geom_vline(aes(xintercept = 0), color = "red") +
+    facet_wrap(~model)
+```
+
+Using my base R plot...
+```{r}
+plot(coeftab(SmR_sim, AtR_sim, SmAtR_sim), pars = c("bAt", "bSm"))
+```
+In terms of interpreting these results, I am a little confused. In comparison to my spurious plot, you can see that "AtR_sim" lines up with the negative correlation I wrote down. *The more attractive you are the less likely you are to read for pleasure.* This is a silly example to come up with, but it does show the point I was trying to understand as in respect to the attractiveness slope (bAt) it stays negatively associated to reading and in respect to my smartness (not a great way to put it, bSm) remains positively associated to reading for pleasure. 
+
+### 5M3
+*It is sometimes observed that the best predictor of fire risk is the presence of freighters— States and localities with many firefighters also have more fires. Presumably firefighters do not cause fires. Nevertheless, this is not a spurious correlation. Instead fires cause firefighters. Consider the same reversal of causal inference in the context of the divorce and marriage data. How might a high divorce rate cause a higher marriage rate? Can you think of a way to evaluate this relationship, using multiple regression?*
+There could be a negative feedback loop with divorce rate and higher marriage rate because of the likelihood for remarriage. This is a tough question. Maybe number of children for individuals who are divorced is a high predictor for remarriage that could cause this influence. The idea is that with higher divorce rates in a given state, the marriage rate could go up because there is a culture around nuclear families as a necessity in the U.S. Especially as the country does not provide subsidized daycare, or proper any financial support for families that fall below our countries median income threshold. So, having kids could be a causal for remarriage because parents want support and help, especially with social forces for marriage as a necessity. 
+
+### 5M4
+*In the divorce data, States with high numbers of members of the Church of Jesus Christ of Latter-day Saints (LDS) have much lower divorce rates than the regression models expected. Find a list of LDS population by State and use those numbers as a predictor variable, predicting divorce rate using marriage rate, median age at marriage, and percent LDS population (possibly standardized). You may want to consider transformations of the raw percent LDS variable.*
+
+Okay! I am going to load in some data to start I suppose.
+```{r}
+data(WaffleDivorce)
+wd <- WaffleDivorce
+LDS <- read_csv("LDS.csv")
+LDS <- LDS %>% 
+  mutate(percent_lds = mormonPop/Pop) %>% 
+  mutate(Loglds = log(percent_lds)) #log transformed
+```
+
+just taking a peek at this for fun
+```{r}
+ggplot(LDS, aes(Loglds)) +
+  geom_histogram()
+```
+
+Okay, well, now I have to join my datasets. 
+```{r}
+wd2 <- wd %>% 
+  mutate(State = Location) #to left join. 
+
+wd_lds <- wd2 %>% 
+  left_join(LDS, by = "State")
+head(wd_lds) ##checking that nothing went wrong
+```
+
+cleaning up and standardizing my soon to be used data for regression.
+```{r}
+head(wd_lds)
+waffles_and_mormons <- wd_lds %>% 
+  drop_na() %>% 
+  select(State, Divorce, Marriage, MedianAgeMarriage, Loglds, percent_lds) %>% 
+  rename(Loc = State,
+          D = Divorce,
+          M = Marriage,
+          A = MedianAgeMarriage,
+          Ll = Loglds,
+         L = percent_lds) %>%
+  mutate(across(c(D, M, A, Ll, L),
+                ~ (.x - mean(.x)) / sd(.x)))
+
+head(waffles_and_mormons) #just checking
+```
+
+I am doing it with both the with logged %lds and the % lds basically to prove my sanity to myself because I know they *should* be about the same here.
+```{r}
+f2list <-
+  alist(
+    D ~ dnorm(mu, sigma),
+    mu <- a + blL*Ll + bA*A + bM*M, 
+    a ~ dnorm(0, 100), #a is the intercept
+    bM ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    blL ~ dnorm(0, 10), 
+    sigma ~ dexp(1)
+  )
+fit2 <- quap(f2list, #fit is my regression
+            data = waffles_and_mormons)
+precis(fit2)
+```
+
+The regular lds %
+```{r}
+f3list <-
+  alist(
+    D ~ dnorm(mu, sigma),
+    mu <- a + bL*L + bA*A + bM*M, #beta here controls slope 2 b straight 
+    a ~ dnorm(0, 100), #a is the intercept
+    bM ~ dnorm(0, 10),
+    bA ~ dnorm(0, 10),
+    bL ~ dnorm(0, 10), 
+    sigma ~ dexp(1)
+  )
+fit3 <- quap(f3list, #fit is my regression
+            data = waffles_and_mormons)
+precis(fit3)
+```
+And as I anticipated, both models have similar results. I'm still glad I checked. The answer is also that yes! LDS percent of a states population does have a negative association with the divorce rate. My lingering thought here is *why does percent LDS members have a larger level of magnitude than I anticipated.* I know that my case observations/unit of analysis is the state here, so maybe there is something about the weight behind the LDS% variable that is making the magnitude of this slope larger than I thought it would? Regardless, this is still not as good as a predictor in comparison to median age. I can't speak to too many implications on this one, because I know very little about LDS culture. 
+
+
+### 5M5
+*Can you outline one or more multiple regressions that address these two mechanisms? Assume you can have any predictor data you need.*
+Key for my abbreviations
+G = Gas prices
+R = Restaurant meals
+E = Exercise 
+O = obesity
+
+Here I am creating a dag for the causal order of the relationships described in the question.
+```{r}
+library(patchwork)
+dag_coords <-
+  tibble(name = c("G", "D", "E", "R", "O"),
+    x = c(G = 1, D = 2, E = 3, R = 3, O = 5),
+    y = c(G = 2, D = 2, E = 1, R = 3, O = 2)
+  )
+
+Dag_1 <-
+  dagify(D ~ G, E ~ D, R ~ D,O ~ E + R,
+         coords = dag_coords) %>%
+   ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "firebrick", alpha = 1/4, size = 10) +
+  geom_dag_text(color = "firebrick") +
+  geom_dag_edges(edge_color = "firebrick") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+Dag_1
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
