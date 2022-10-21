@@ -1,0 +1,228 @@
+---
+title: "SR_CH7_HW"
+author: "Rachel Kaufman"
+date: "2022-10-20"
+output: html_document
+---
+#* **SR Chapter 7 Homework**
+
+The very classic starting by loading in all my fun little packages...
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rethinking)
+library(tidyverse)
+library(dagitty)
+library(tidybayes)
+library(tidybayes.rethinking)
+library(ggdag)
+library(ggplot2)
+```
+## **Easy Problems**
+
+### **7E1**
+*State the three motivating criteria that define information entropy. Try to express each in your own words.*
+
+First, information entropy is a function that allows us to determine the uncertainty of a model through the known probabilities with our given data. The specific definition is the average log probability of the uncertainty contained within a probability distribution (distribution of our data/observations). Further, I am pretty sure the log within our information entropy scales our output to be relative. Then, there are three properties that have to be maintained for the function to even work! They are as follows:
+1. This measure of uncertainty *must* be continuous. Any gaps/discontinuity within the measure would cause a large fluctuation in uncertainty that would not be at the fault of our data. 
+2. The measure of uncertainty *must* increase and the number of parameters increases. Parameters here could mean any added complexity or event to the regression. This is because there is more to predict when you have additional parameters. So, if there is an additional layer of prediction, uncertainty increase as the number of possibilities increase.
+3. The measure of uncertainty *must* be additive. So, if there are x number of parameters and they have z number of options, we should be adding up each z per each x variable. So, if there are two parameters with three options for the first parameter and two options for the second parameter, there should be an added together of a total of each 5 uncertainty values to construct a summation final value. 
+
+### **7E2**
+*Suppose a coin is weighted such that, when it is tossed and lands on a table, it comes up heads 70% of the time. What is the entropy of this coin?*
+
+Okay, so I know my entropy is the sum of my probabilities logged. If it is .7 heads, that means the probability for tails is .3, because your probability has to add to 1, and I highly doubt it can land on its side. I used both because of the additive rule mentioned above, you can't just do this for part of the equation even though the .3 is not directly stated. (At least, I don't think you can...)
+```{r}
+p <- as_tibble(
+  c(0.7, 0.3)
+) 
+-sum(p*log(p)) ##this is my entropy information equation
+
+```
+Thee entropy of this coin is 0.61. I am using McElreath's base R because Steve said it was ok for this unit. 
+
+### **7E3**
+
+*Suppose a four-sided die is loaded such that, when tossed onto a table, it shows “1” 20%, “2” 25%, “3” 25%, and “4” 30% of the time. What is the entropy of this die?*
+
+```{r}
+p.E3 <- as_tibble(
+  c(0.2, 0.25, 0.25, 0.3)
+) 
+
+-sum(p.E3*log(p.E3))
+```
+My entropy for this question is 1.376. 
+
+### **7E4**
+*Suppose another four-sided die is loaded such that it never shows “4”. The other three sides show equally often. What is the entropy of this die?*
+Well, if they are four sides, but never shows 4, then the probability of 4 is 0 and for the other remaining sides it would be .33. I am not sure if I need to put in the 0, I think I do, but I am going to do it both ways to check. 
+```{r}
+#without the 0
+p.E4_1 <- as_tibble(
+  c(0.333, 0.333, 0.333)
+) 
+-sum(p.E4_1*log(p.E4_1))
+
+#with the 0
+p.E4_2 <- as_tibble(
+  c(0.333, 0.333, 0.333, 0)
+) 
+-sum(p.E4_2*log(p.E4_2))
+```
+Well, when you include the 0 term your output becomes "NaN." So I am going to then say you do not, which means my entropy is 1.098. 
+
+## **Medium Problems**
+
+### **7M1**
+
+*Write down and compare the definitions of AIC and WAIC. Which of these criteria is most general? Which assumptions are required to transform the more general criterion into a less general one?*
+
+So, AIC is the large sample approximation of cross validation. I know it gives the same score/answer as a leave-one out cross-validation, but is *much* faster because it does not require a posterior draw for every observation point in the data. A simplified version of the equation:
+$$
+AIC = -2*lppd +2p
+$$
+where lppd is the log-pointwise probability density, and p are my parameters.
+
+WAIC is very similar, it also provides an approximation of the out of sample deviance in a large sample. This has a more complicated penalty than -2 seen in AIC.The goal of WAIC is to not worry about the cross-validation like AIC, it is focused on the KL divergence (i.e. the deviance), which is measuring the difference out of sample between our model(s) and the target model.  
+
+The difference between AIC and WAIC is that WAIC makes **no assumption** about our priors, where AIC assumes the priors are flat. AIC also cannot have more parameters than there are observations, n, but that should be a very unlikely scenario to occur. I would hope no one is throwing in more parameters than their sample size. 
+
+### **7M2**
+*Explain the difference between model selection and model comparison. What information is lost under model selection?*
+
+So model selection refers to the type of model we are selecting that will have the lowest criterion value. This has to do with the fit of the model to the sample, n, data points we already have. A good example on how to think of this is about the degree of polynomials you put in your regression. They do not just have to be linear! You can introduce quadratic, cubic, quartic, etc. For model selection you pick based off criterion such as this example above, however, you throw away any important information about the differeences between each model. That is sort of a problem because then you lose the chance to examine how confident you are in a particular model.  
+
+Model comparison has to do with comparing the models with the inclusion of specific variables and how they might influence predictions. Model comparison can be used with causal models to look at any potentially implied conditional independencies among variables. 
+
+### **7M3**
+*When comparing models with an information criterion, why must all models be fit to exactly the same observations? What would happen to the information criterion values, if the models were fit to different numbers of observations? Perform some experiments, if you are not sure.*
+
+Okay, right off the bat with this question, it feels pretty obvious that if you had a different number of observations, depending on relative sample size, has the capacity to change a lot in any given model. Generally I think that where the smaller the sample of the observations and any given observations specific location in its distribution could make all the difference in changing information criterion values. So here, less values would really change a lot because the deviance will change as its partly based in the summation of N values (i think!). 
+
+And to prove it, I guess I should show some simulated examples.
+**here is my general line of logic on how to figure this out:**
+I know that if two models have a different number of observations, they cannot be compared for their WAIC, BIC, AIC, etc because those numbers are relative to the data within the model. If you wanted to compare those we would be talking about changing/adding parameters (right?). Plus, that is not what the question is asking me. Knowing this, I need to find a way to compare how any given WAIC score changes when the number of observations increase. 
+
+First, create a function that creates a WAIC simulation. I need to not define N yet, because this will be at some point in some graph my x axis. 
+```{r}
+N <- 100
+waic_sim_data <- function(N){ #trying to set it as a function to avoid setting my N for now
+  
+data <- tibble(x = rnorm(N),
+                     y = rnorm(N)) %>% 
+    mutate(across(everything(), standardize))  ##creating a usable general function
+
+mod <- quap(
+  alist( #alist() handles arguments below as function arguments
+    y ~ dnorm(mu, sigma), ## setting my priors and regression info for quap
+    mu ~ a + Bx*x,
+    a ~ dnorm(0,0.5), 
+    Bx ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+    ), data) 
+  
+mod %>% WAIC() %>% as_tibble() %>% pull(WAIC) 
+}
+
+
+
+```
+
+Okay now that I have a set function, regression and WAIC values, lets go ahead and set my sample to do different values and see how this changes things. In order to see anything, I obviously have to plot it. First to do this, I need a data frame of WAIC values changing over number of samples.
+```{r}
+library(purrr)
+
+list <- seq(100,1000, 50)
+runs <- tibble(
+  run = 1:length(list),
+  waic = map_dbl(list, .f = waic_sim_data))
+```
+
+and the time comes for my plot (finally)
+```{r}
+WAIC_vs_sample <- ggplot(data = runs, aes(list, waic)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Number of observations", 
+       caption = "Figure 1: Simulation of WAIC values of the same data 
+       based on the increasing number of samples.") 
+
+WAIC_vs_sample
+```
+
+### **7M4**
+*What happens to the effective number of parameters, as measured by PSIS or WAIC, as a prior becomes more concentrated? Why? Perform some experiments, if you are not sure*
+The priors can constrain our parameters, causing the model to be less flexible in fitting the sample! And constraining them a ton! This would decrease the number of effective parameters.
+
+create two examples, and compare them. One with a more concentrated prior, and one without. This time I am going to use actual random data from cars, because I spent two hours on thee simulated data for 7M3 and do not want to do that again. 
+```{r}
+data("mtcars")
+tight_priors <- quap( 
+  alist(
+  mpg ~ dnorm(mu, sigma),
+  mu <- a + bwt*wt,
+  a ~ dnorm(0,0.2),
+  bwt ~ dnorm(0,0.2),
+  sigma ~ dexp(1)
+  ),
+data = mtcars) 
+
+##lets do some medium priors to get an even better look at the stages
+medium_priors <- quap( 
+  alist(
+  mpg ~ dnorm(mu, sigma),
+  mu <- a + bwt*wt,
+  a ~ dnorm(0,2),
+  bwt ~ dnorm(0,2),
+  sigma ~ dexp(1)
+  ),
+data = mtcars) 
+
+##now lets widen the priors
+wide_priors <- quap( 
+  alist(
+  mpg ~ dnorm(mu, sigma),
+  mu <- a + bwt*wt,
+  a ~ dnorm(0, 20),
+  bwt ~ dnorm(0, 20),
+  sigma ~ dexp(1)
+  ),
+data = mtcars)
+
+compare(tight_priors, medium_priors, wide_priors) #do not judge their differences in stand errors but judge the difference between the standard errors
+```
+The compare values here show a WAIC much lower for wide priors in comparison to tight priors. BUT we are interested in the effective number of parameters, given by our pWAIC value. This does show my initial response that the tighter the priors, the decrease in parameters. :)
+
+plotting the comparison for visual effects for myself 
+```{r}
+plot(compare(wide_priors, tight_priors))
+```
+
+### **7M5**
+*Provide an informal explanation of why informative priors reduce overfitting.*
+
+Well, the literal job of priors is to inform our likelihoods when sampling to creeate the prior distribution. If overfitting means that the model captures too much "noise" (not just capturing what the data says but additional space around it), then the target population we are trying to examine may lead to unrealistic values if we have overfitting. So, informative priors will reduce overfitting because they will be attune to ignoring this noise i.e., any unexpected/unrealistic results from posterior prediction.
+
+### **7M6**
+*Provide an informal explanation of why overly informative priors result in underfitting*
+
+If priors are too concentrated, it will tell the model to ignore the patterns in the real data, not just influence its ability to predict said data. This then reduces predictive performance. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
