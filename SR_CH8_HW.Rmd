@@ -1,0 +1,220 @@
+---
+title: "SR_CH8_HW"
+author: "Rachel Kaufman"
+date: "2022-10-28"
+output: html_document
+---
+### **SR Chapter 8 Homework**
+
+Loading packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rethinking)
+library(tidyverse)
+library(dagitty)
+library(tidybayes)
+library(tidybayes.rethinking)
+library(ggdag)
+library(ggplot2)
+library(parameters)
+library(modelsummary)
+library(rstanarm)
+library(gssr)
+```
+
+Honestly, this homework is FRIGHTENING. Attempting obviously but yowza> 
+```{r}
+
+```
+
+#### Easy Problems
+
+##### **8E1**
+*For each of the causal relationships below, name a hypothetical third variable that would lead to an interaction effect.*
+*(1) Bread dough rises because of yeast.*
+  A hypothetical third variable for this would be the tempature in which the bread is cooked at. Temperature would interact with both yeast and the extent in which dough can rise. So, if dough rising is my outcome of interest, it depends on how hot the oven is and how much yeast is in the batter.
+  
+*(2) Education leads to higher income.*
+We went over this in class using gender as an interacting term actually! Gender will influence the outcome of higher income and interacts with levels of education. Ones income depends on their education level and their gender. 
+
+*(3) Gasoline makes a car go.*
+Gasoline and engine oil make a car go. The car going depends on both engine oil and gasoline, the amount of oil the car has will influence the amount of gas used to make the car go.
+
+##### **8E2**
+*Which of the following explanations invokes an interaction?*
+(1) Caramelizing onions requires cooking over low heat and making sure the onions do not dry out.
+(2) A car will go faster when it has more cylinders or when it has a better fuel injector.
+(3) Most people acquire their political beliefs from their parents, unless they get them instead from their friends.
+(4) Intelligent animal species tend to be either highly social or have manipulative appendages (hands, tentacles, etc.).
+
+The only one that has an interaction seems to be *(1)*. The low heat is clearly interdependent with whether or not the onions dry out. 
+
+##### **8E3**
+*For each of the explanations in 8E2, write a linear model that expresses the stated relationship.*
+
+(1) L refers to low heat and D is drying out. 
+$$
+\begin{aligned}
+\ CarOnion &\sim Normal(\mu, \sigma)\\
+\mu_i &= \alpha + \beta_lL_i + \beta_dD_i + \beta_{LH}L_iD_i \\
+\end{aligned}
+$$
+(2) Vehicle (V), cylinder (C), and Fuel injector (F)
+$$
+\begin{aligned}
+\ V &\sim Normal(\mu, \sigma)\\
+\mu_i &= \alpha + \beta_cC_i + \beta_fF_i  \\
+\end{aligned}
+$$
+(3) Acquired political beliefs (A), Parents (P), friends (F)
+$$
+\begin{aligned}
+\ A &\sim Normal(\mu, \sigma)\\
+\mu_i &= \alpha + \beta_pP_i + \beta_fF_i  \\
+\end{aligned}
+$$
+(4) Intelligent animal species (A), how social they are (S), manipulative appendages (M)
+$$
+\begin{aligned}
+\ A &\sim Normal(\mu, \sigma)\\
+\mu_i &= \alpha + \beta_sS_i + \beta_mM_i  \\
+\end{aligned}
+$$
+
+#### Medium Problems
+
+##### **8M1**
+*Recall the tulips example from the chapter. Suppose another set of treatments adjusted the temperature in the greenhouse over two levels: cold and hot. The data in the chapter were collected at the cold temperature. You find none of the plants grown under the hot temperature developed any blooms at all, regardless of the water and shade levels. Can you explain this result in terms of interactions between water, shade, and temperature?*
+So, yes! I can explain this. If none of the plants grown under hot temperatures developed any blooms, its obvious that there must be an interaction with both water and shade. Say the temperatures cause a faster rate of evaporation for the water in the plants soil, well then it would be that temperature is masking or mediating the effect water could have on blooming. Then if shade comes into play, it being hot and shaded, a plant is likely to do a 180 and start to die honestly because of the negative interactions with a lack of access to sunlight and then an overexposure to heat. It all comes together when you consider water in the dynamic as well, because if there are high levels of watering then maybe that would mitigate the dying of the overheated plant with minimal exposure to light. Each effect depends on the other in terms of the magnitude of the outcome, the blooming of the tulip!
+
+##### **8M2** 
+*Can you invent a regression equation that would make the bloom size zero, whenever the temperature is hot?*
+
+$$
+\begin{aligned}
+\ Bloom &\sim Normal(\mu, \sigma) \\
+\mu = \alpha_{temp} + \beta_{temp}Shade_i + \beta_{temp}Water_i \\
+\end{aligned}
+$$
+So, I figured indexing would be the best way to make sure bloom would be equal to 0 in this instance. If temperature is indexed then we are sort of stratifying to our original three parameters, alpha, beta1 for shade and beta2 for water. If I made the variable temperature as a binary indicator with hot as 0 and cold as 1, my assumption is that bloom would then be 0. Also, I tried aligning this a few times and could not get it to line up the way I wanted! Unsure why the latex has it centereed on the first and last words of the lines. 
+
+##### **8M3**
+*In parts of North America, ravens depend upon wolves for their food. This is because ravens are carnivorous but cannot usually kill or open carcasses of prey. Wolves however can and do kill and tear open animals, and they tolerate ravens co-feeding at their kills. This species relationship is generally described as a “species interaction.” Can you invent a hypothetical set of data on raven population size in which this relationship would manifest as a statistical interaction? Do you think the biological interaction could be linear? Why or why not?*
+
+I cannot believe I am writing this. 
+Ravens feed off of wolves kill, raven is my outcome
+Wolves kill and let ravens feed
+prey around
+```{r}
+set.seed(102822)
+N <- 1000
+bP <- .4 ##the number of prey 
+bPW <- .7 ##this interaction would be greatest for raven population
+bW <- .2 ##lower # of wolves means less access to food
+
+  Ecosystem <- tibble(
+  prey = rnorm(N, mean = 100, sd = 10),
+  wolves = rnorm(N, mean = 100, sd = 5),
+  ravens = rnorm(N, bW*wolves + bP*prey + prey*wolves*bPW, sd = 15)
+)
+  
+
+plot(ravens~wolves, Ecosystem)
+plot(ravens~prey, Ecosystem)
+```
+
+Okay, I am going to use this ecosystem data frame to form a regression equation for this interaction, which includes setting my little bestie priors.
+```{r}
+m <- quap(
+  alist( 
+    ravens ~ dnorm(mu, sigma),
+    mu <- bW*wolves + bP*prey + bPW*prey*wolves,
+    bP ~ dnorm(0,1),
+    bW ~ dnorm(0,1),
+    bPW ~ dnorm(0,1),
+    sigma ~ dexp(1)),
+  data = Ecosystem
+)
+precis(m) ##Looks similar to my assigned beta terms! yay!
+
+```
+
+Parameters are linear, so this is a linear function. The parameter effects are not dependent on each other! It's rather that population itself, the data, or how we manipulate the data, is what is "non linear." That does not change the use of linear regression :) 
+
+
+**8M4**
+*Repeat the tulips analysis, but this time use priors that constrain the effect of water to be positive and the effect of shade to be negative. Use prior predictive simulation. What do these prior assumptions mean for the interaction prior, if anything?*
+
+loading up our data and scaling our terms.
+```{r}
+data(tulips)
+d <- tulips 
+str(d)
+
+d2 <- d %>% 
+  mutate(
+    blooms_std = blooms/max(blooms),
+    water_cent = water - mean(water),
+    shade_cent = shade - mean(shade)
+  )
+
+```
+
+Using McElreath's code is this:
+```{r}
+
+m8.5 <- quap(
+alist(blooms_std ~ dnorm(mu, sigma),
+      mu <- a + bw*water_cent + bs*shade_cent + bws*water_cent*shade_cent,
+      a ~ dnorm(0.5 , 0.25),
+      bw ~ dnorm(0 , 0.25),
+      bs ~ dnorm(0 , 0.25), 
+      bws ~ dnorm(0 , 0.25),
+      sigma ~ dexp(1)),
+data = d2)
+
+```
+
+Here I am altering it, for straining the slopes to make water positive and then shade negative:
+```{r}
+set.seed(1028)
+m8.51 <- quap(
+alist(blooms_std ~ dnorm(mu, sigma),
+      mu <- a + bw*water_cent + bs*shade_cent + bws*water_cent*shade_cent,
+      a ~ dnorm(0.5, 0.25),
+      bw ~ dnorm(0.25, 0.1),
+      bs ~ dnorm(-0.25, 0.1), #altering sd to tighten the prior!
+      bws ~ dnorm(-0.25, 0.25),
+      sigma ~ dexp(1)),
+data = d2)
+```
+
+Also, here is how i would do it using the `rstanarm` package. This did not work, which is annoying but now that I am thinking on it, is using this path even possible for the question? It is asking for a change in my slopes for two of my beta coefficients but the `prior = ` is a stand in for all coefficients which clearly presents an issue. If there is a way to differentiate priors using the `stan_glm` that would be fantastic, but alas I do not know how. 
+```{r, error=TRUE}
+m8.52 <- stan_glm(blooms_std ~ bw*water_cent + bs*shade_cent + bws*water_cent*shade_cent,
+         data = d2,
+         prior_intercept = normal(0,1, autoscale = TRUE),
+         prior = normal(0, 1, autoscale = TRUE),
+         prior_aux = exponential(1, autoscale = TRUE),
+         algorithm = "sampling")
+```
+
+Okay, now I need to do prior draws. I am using McElreath's code again, only because I used QUAP() and am feeling trapped! I want to learn the `rstanarm` package, I just am unfamiliar how to adjust the priors to be able to use my `m8.52` in the first place :(
+```{r}
+set.seed(1028)
+priors <- extract.prior(m8.51)
+##was hoping to do something with this but
+
+par(mfrow = c(1,3)) # 3 plots in 1 row
+for (s in -1:1 ) {
+idx <- which( d$shade_cent == s)
+plot( d$water_cent[idx], d$blooms_std[idx], xlim = c(-1,1) , ylim = c(0,1),
+xlab = "water" , ylab = "blooms" , pch = 16 , col = rangi2 )
+mu <- link(m8.51, post = priors, data = data.frame(shade_cent = s, water_cent = -1:1))
+for (i in 1:20) lines(-1:1, mu[i,], col=col.alpha("black",0.3))
+}
+```
+I think these graphs show you the general sentiment of being well-informed priors. They go in order from -1:1 with 1 being total shade. You can see the general trend of positive slopes and then more negative slopes when you have total shade. If they constitute as over-fitting, well... maybe. I am not entirely sure when you cross that line! Obviously, over-fitting is bad but I am still having a hard time differentiating when you are over-fitting and when you are not. 
+
+
+
