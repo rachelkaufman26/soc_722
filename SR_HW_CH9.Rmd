@@ -1,0 +1,185 @@
+---
+title: "SR_HW_CH9"
+author: "Rachel Kaufman"
+date: "2022-11-03"
+output: html_document
+---
+## Chapter 9 Homework, Statistical Rethinkning
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rethinking)
+library(rstanarm)
+library(ggplot2)
+library(tidybayes.rethinking)
+library(devtools)
+library(patchwork)
+library(bayesplot)
+library(devtools)
+library(tidybayes)
+library(gssr)
+library(dplyr)
+library(bayesplot)
+```
+
+### **Easy Problems**
+
+#### **9E1**
+*Which of the following is a requirement of the simple Metropolis algorithm? (1) The parameters must be discrete. (2) The likelihood function must be Gaussian. (3) The proposal distribution must be symmetric.*
+I think its 1 and 3. The textbook says it can be continuous through, which is the opposite of discrete so hmm. I guess it is just 3. Does this mean then that the other things we have been doing (quad approx) require discrete parameters? The whole goal of MCMC is ya know, avoiding Gaussian for the likelihood function, so that is absolutely not it. 
+
+#### **9E2**
+*Gibbs sampling is more efficient than the Metropolis algorithm. How does it achieve this extra efficiency? Are there any limitations to the Gibbs sampling strategy?*
+I think its the symmetric thing. That Gibbs allows for asymmetry. Also, it doesn't require you to move from probability of point to point, I think it uses conjugate pairs. What those do, weell they let there be adaptive proposals. Thus, smarter choices from Gibbs and therefore more efficient... Beyond that I can't explain thee conjugate pairs thing. it is more efficient then the having to do next to the jump probability like with the Metropolis algorithm. 
+
+#### **9E3**
+*Which sort of parameters can Hamiltonian Monte Carlo not handle? Can you explain why?*
+Ohh this is a good question. I want to say that HMC can handle discrete values, but this question is asking what HMC *cannot* handle. also, it requires specific fixing we will learn in ch. 15 & 16 to use descrete values. UTURN could be an issue, because it is more likely for sampling from the distribution "in the same area." But there is some fancy NUTS thing to fix that so this is also a strength, or at least a can be accounted for weakness. So the limitations would be the fact that it requires continuous parameters and divergent transitions. 
+
+#### **9E4**
+*Explain the difference between the effective number of samples, n_eff as calculated by Stan, and the actual number of samples.*
+Okay, first, effective number of samples is relative to the other iteration chains, there is no finite value it should match. n_eff would be the idea of if wee had one longggg samplee chain where each chain was independent of the one before it, then the sample repreesents the number of effective samples needed to compute what you are looking for. Your actual sample is just that, your literal, actual sample. 
+
+####  **9E5**
+*Which value should Rhat approach, when a chain is sampling the posterior distribution correctly?*
+So the Rhat is an indicator of the convergene of the Markov chains to the target distribution.... So! The value needs to be as close to one as possible.
+
+#### **9E6**
+*Sketch a good trace plot for a Markov chain, one that is effectively sampling from the posterior distribution. What is good about its shape? Then sketch a trace plot for a malfunctioning Markov chain. What about its shape indicates malfunction?*
+I'm not much of a drawer, but I think I can manage some code for this.
+First, lets simulate some data. 
+```{r}
+set.seed(114)
+##get the data
+data(rugged)
+d <- tibble(rugged)
+##clean it up
+class(rugged)
+dd <- d %>% 
+  drop_na(rgdppc_2000) %>% 
+  mutate(log_gdp = log(rgdppc_2000)) %>% 
+         mutate(log_gdp_std = log_gdp/mean(log_gdp)) %>% 
+         mutate(rugged_std = rugged/max(rugged)) %>% 
+         mutate(cid = ifelse(cont_africa == 1,1,2))
+dd <- dd %>% 
+  select(log_gdp_std, log_gdp, cont_africa, rugged_std, cid)
+         
+#making an iteration chain wooo MCMC
+m9.1 <- ulam( 
+  alist(log_gdp_std ~ dnorm( mu , sigma ),
+        mu <- a[cid] + b[cid]*( rugged_std - 0.215 ),
+        a[cid] ~ dnorm( 1 , 0.1 ),
+        b[cid] ~ dnorm( 0 , 0.3 ),
+        sigma ~ dexp( 1 )),
+  data= dd, chains=4 , cores=4 )
+precis(m9.1, 2) #two shows us both values bc we are using an index variable
+traceplot(m9.1)
+```
+The shapes malfunction is indicated by the sharpness and sporadic-ness of the trace plot along the x-axis. If the density gets super bonkers, the trace plot would be over weighted on different spots. 
+
+####  **9E7**
+*Repeat the problem above, but now for a trace rank plot.*
+```{r}
+trankplot(m9.1)
+```
+This is a similar answer, but now trank plot where you ~rank~ these bad boys. So the ranking, then helps because it lets us get a better view!
+### **Medium Problems**
+
+####  *9M1*
+Re-estimate the terrain ruggedness model from the chapter, but now using a uniform prior for the standard deviation, sigma. The uniform prior should be dunif(0,1). Use ulam to estimate the posterior. Does the different prior have any detectable influence on the posterior distribution of sigma? Why or why not?
+```{r}
+m9.2 <- ulam( 
+  alist(log_gdp_std ~ dnorm( mu , sigma ),
+        mu <- a[cid] + b[cid]*( rugged_std - 0.215 ),
+        a[cid] ~ dnorm( 1 , 0.1 ),
+        b[cid] ~ dnorm( 0 , 0.3 ),
+        sigma ~ dunif(0,1)),
+  data= dd, chains=4 , cores=4 )
+
+precis(m9.2, 2)
+precis(m9.1, 2)
+
+m9.2_post <- extract.samples(m9.2) %>% pluck("sigma")
+m9.1_post <- extract.samples(m9.1) %>% pluck("sigma")
+compare <- tibble(original = m9.1_post,
+                  uniform = m9.2_post) %>% 
+  pivot_longer(names_to = "model",
+               values_to = "sigma",
+               cols = everything())
+
+compare %>% ggplot(aes(x = sigma, fill = model)) +
+  geom_density(alpha =.3) + theme_minimal()
+```
+The only difference really is the n_eff, where they are lower for our model with a dunif(0,1) prior for sigma. This shows us that there really isn't much of a difference in our output, but the sample would be more efficient as 9.2m bc it has the lower n_eff value. 
+
+#### **9M2**
+*Modify the terrain ruggedness model again. This time, change the prior for b[cid] to dexp(0.3). What does this do to the posterior distribution? Can you explain it?*
+
+I guess I can... Here we go!
+```{r}
+m9.3 <- ulam( 
+  alist(log_gdp_std ~ dnorm( mu , sigma ),
+        mu <- a[cid] + b[cid]*( rugged_std - 0.215),
+        a[cid] ~ dnorm( 1 , 0.1),
+        b[cid] ~ dexp(0.3),
+        sigma ~ dexp(1)),
+  data = dd, chains = 4, cores = 4)
+
+precis(m9.3,2)
+
+m2.9.3_post <- extract.samples(m9.3) %>% pluck("b")
+m2.9.1_post <- extract.samples(m9.1) %>% pluck("b")
+comparing_m2 <- tibble(original = m2.9.1_post,
+                  b_dexp = m2.9.3_post) %>% 
+  pivot_longer(names_to = "model",
+               values_to = "b",
+               cols = everything())
+
+comparing_m2 %>% ggplot(aes(x = b[,1], fill = model)) +
+  geom_density(alpha = .3) + theme_minimal()
+
+comparing_m2 %>% ggplot(aes(x = b[,2], fill = model)) +
+  geom_density(alpha = .3) + theme_minimal()
+
+```
+Well this exponential prior strains it to be positive (when it should be negative). This is going to make a huge difference. And tahda you absolutely can see how crazy a difference that bonkers prior made. 
+
+#### **9M3**
+*Re-estimate one of the Stan models from the chapter, but at different numbers of warm-up iterations. Be sure to use the same number of sampling iterations in each case. Compare the n_eff values. How much warm-up is enough?*
+
+I am still using the ruggedness, because I like it. This is on page 287... The warm-up is half of the iter, which is at the default of 1000. So, my warm-up is 500. Guess that means I am going to compare a few and see whats up!
+```{r}
+set.seed(7)
+m3_9.1 <- ulam( 
+  alist(log_gdp_std ~ dnorm( mu , sigma),
+        mu <- a[cid] + b[cid]*( rugged_std - 0.215),
+        a[cid] ~ dnorm(1 , 0.1),
+        b[cid] ~ dnorm(0 , 0.3),
+        sigma ~ dexp(1)),
+  data = dd, chains = 4, cores = 4, warmup = 500)
+traceplot(m3_9.1)
+precis(m3_9.1)
+
+m3_9.12 <- ulam( 
+  alist(log_gdp_std ~ dnorm( mu , sigma),
+        mu <- a[cid] + b[cid]*( rugged_std - 0.215),
+        a[cid] ~ dnorm(1 , 0.1),
+        b[cid] ~ dnorm(0 , 0.3),
+        sigma ~ dexp(1)),
+  data = dd, chains = 4, cores = 4, warmup = 400)
+traceplot(m3_9.12)
+precis(m3_9.12)
+
+m3_9.13 <- ulam( 
+  alist(log_gdp_std ~ dnorm( mu , sigma),
+        mu <- a[cid] + b[cid]*( rugged_std - 0.215),
+        a[cid] ~ dnorm(1 , 0.1),
+        b[cid] ~ dnorm(0 , 0.3),
+        sigma ~ dexp(1)),
+  data = dd, chains = 4, cores = 4, warmup = 300)
+traceplot(m3_9.13)
+precis(m3_9.13)
+
+```
+Okay, so they (the n_eff samples) get bigger at first as you increase the warm-up size. I am starting at the default of 500 for the warm-up size. So, fewer warm up samples means there is more guessing for STAN, leading to a relatively higher n_eff by comparison. That makes a lot of sense! Once the warm-up gets toooo small, stan doesn't know what do to! Too much autocorrelation and stan cannot determine your step wise. Then if the warm-up gets too large, you regrow that n_eff because it is very costly in terms of time it takes. 
