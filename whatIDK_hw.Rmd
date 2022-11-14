@@ -1,0 +1,34 @@
+---
+title: "WhatIDK_HW"
+author: "Rachel Kaufman"
+date: "2022-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Things I do not understand....
+
+#1
+I do not get PSIS at all or AIC/ BIC. I get what they are used for (model selection), but not what they each measure, at least, not really. 
+
+#2
+There is a specific plot that just breaks my brain every time I look at it, and I have a super difficult time interpreting it. Its the coef plot with comparing betas to see masking of relationships when different confounders are introduced. I understand how that occurs conceptually, but then trying to compare  i really don't conceptually understand masking... like how a variable if introduced could mask outcomes and how to read it when looking at a coefficient plot. 
+
+![Figure 1](/Users/rachelkaufman/Documents/soc_722/coefRplot.png)
+Here is an example from an old homework. I guess how I see this is that "SmAtR" (all three parameters together) have different values depending on which independent variable is in reference. This confuses me because if our linear equation is additive I assume that whichever perspective you take from either independent variable (bAt or bSm) it would yield the same outcome because they are both being used in the model in an additive way... but then that is clearly not true and shouldn't be but I am not so sure where I am getting so tripped up. so. I am unsure if I am making any sense with what I am confused with, but here we are. 
+
+
+#3
+Model selection vs model comparison? I see that selection is about which is the most precise and you would use some sort of measure (PSIS, WAIC, BIC, AIC, etc) butttttttt I am unsure with how this relates to model comparison. 
+
+#4
+Just going over counter factual models would be really really great. Maybe that's what I do not understand within the model comparison umbrella, and that's what model comparison is in reference to. I genuinely don't know how they operate, and when one should use them.
+
+
+
+
+
